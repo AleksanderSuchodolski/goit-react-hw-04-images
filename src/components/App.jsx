@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { Notify } from 'notiflix/build/notiflix-notify-aio';
 
 import { fetchPhoto, fetchError } from '../api/api';
@@ -18,30 +18,24 @@ export const styleNotify = {
   width: '300px',
   fontSize: '20px',
 };
-export class App extends Component {
-  state = {
-    page: 1,
-    search: '',
-    photos: [],
-    isLoading: false,
-    btnLoadMore: false,
-    showModal: false,
-    selectedPhoto: null,
-  };
+export const App = () => {
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [photos, setPhotos] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [btnLoadMore, setBtnLoadMore] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
 
-  componentDidUpdate = (_, prevState) => {
-    const nextPage = this.state.page;
-    const nextSearch = this.state.search;
-    const prevPage = prevState.page;
-    const prevSearch = prevState.search;
-
-    if (prevSearch !== nextSearch || prevPage !== nextPage) {
-      this.addNewPage(nextSearch, nextPage);
+  useEffect(() => {
+    if (!search) {
+      return;
     }
-  };
+    addNewPage(search, page);
+  }, [search, page]);
 
-  addNewPage = (search, page) => {
-    this.setState({ isLoading: true });
+  const addNewPage = (search, page) => {
+    setIsLoading(true);
 
     fetchPhoto(search, page, perPage)
       .then(data => {
@@ -63,85 +57,69 @@ export class App extends Component {
           })
         );
 
-        this.setState(prevState => ({
-          photos: [...prevState.photos, ...photoArray],
-        }));
+        setPhotos(prevPhotos => [...prevPhotos, ...photoArray]);
 
         if (totalPage > page) {
-          this.setState({ btnLoadMore: true });
+          setBtnLoadMore(true);
         } else {
           Notify.info(
             "We're sorry, but you've reached the end of search results.",
             styleNotify
           );
-          this.setState({ btnLoadMore: false });
+          setBtnLoadMore(false);
         }
       })
       .catch(fetchError)
-      .finally(() => {
-        this.setState({ isLoading: false });
-      });
+      .finally(() => setIsLoading(false));
   };
 
-  onSubmitSearch = searchImage => {
-    if (searchImage === this.state.search) {
+  const onSubmitSearch = searchImage => {
+    if (searchImage === search) {
       Notify.info('Enter new request, please!', styleNotify);
       return;
     }
 
-    this.setState({
-      search: searchImage,
-      page: 1,
-      photos: [],
-    });
+    setSearch(searchImage);
+    setPage(1);
+    setPhotos([]);
   };
 
-  toggleModal = () => {
-    this.setState(({ showModal }) => ({
-      showModal: !showModal,
-    }));
+  const toggleModal = () => {
+    setShowModal(prevShowModal => !prevShowModal);
   };
 
-  onClickOpenModal = evt => {
-    const { photos } = this.state;
+  const onClickOpenModal = evt => {
     const idImage = evt.target.getAttribute('data-id');
-    const selectedPhoto = photos.find(photo => photo.id === Number(idImage));
-    this.setState({ selectedPhoto });
-    this.toggleModal();
-  };
-
-  onClickReloading = () => {
-    this.setState(({ page }) => ({
-      page: page + 1,
-      btnLoadMore: false,
-    }));
-  };
-
-  render() {
-    const { photos, btnLoadMore, isLoading, showModal, selectedPhoto } =
-      this.state;
-
-    return (
-      <Container>
-        <Title>Image finder</Title>
-        <Searchbar onSubmitSearch={this.onSubmitSearch} />
-
-        <AppContainer>
-          {photos.length !== 0 && (
-            <ImageGallery
-              photos={photos}
-              onClickImage={this.onClickOpenModal}
-            />
-          )}
-          {isLoading && <Loader />}
-        </AppContainer>
-        {photos.length !== 0 && btnLoadMore && (
-          <Button onClickReloading={this.onClickReloading} />
-        )}
-        {showModal && (
-          <Modal selectedPhoto={selectedPhoto} onClose={this.toggleModal} />
-        )}
-      </Container>
+    const selectedLargePhoto = photos.find(
+      photo => photo.id === Number(idImage)
     );
-  }
-}
+    setSelectedPhoto(selectedLargePhoto);
+
+    toggleModal();
+  };
+
+  const onClickReloading = () => {
+    setPage(prevPage => prevPage + 1);
+    setBtnLoadMore(false);
+  };
+
+  return (
+    <Container>
+      <Title>Image finder</Title>
+      <Searchbar onSubmitSearch={onSubmitSearch} />
+
+      <AppContainer>
+        {photos.length !== 0 && (
+          <ImageGallery photos={photos} onClickImage={onClickOpenModal} />
+        )}
+        {isLoading && <Loader />}
+      </AppContainer>
+      {photos.length !== 0 && btnLoadMore && (
+        <Button onClickReloading={onClickReloading} />
+      )}
+      {showModal && (
+        <Modal selectedPhoto={selectedPhoto} onClose={toggleModal} />
+      )}
+    </Container>
+  );
+};
